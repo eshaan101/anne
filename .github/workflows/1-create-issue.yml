@@ -1,26 +1,41 @@
-name: Move README.md on Issue Creation
+name: Issue Triggered Workflow
 
 on:
   issues:
     types: [opened]
 
+permissions:
+  contents: write
+
 jobs:
-  move-readme:
+  get_current_step:
+    name: Check current step number
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v2
+      - id: get_step
+        run: |
+          echo "current_step=$(cat ./.github/steps/-step.txt)" >> $GITHUB_OUTPUT
+    outputs:
+      current_step: ${{ steps.get_step.outputs.current_step }}
 
-    - name: Move README.md from step1 to step2
-      run: |
-        mkdir -p step2
-        mv step1/README.md step2/README.md
-
-    - name: Commit changes
-      run: |
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
-        git add .
-        git commit -m 'Move README.md from step1 to step2 on issue creation'
-        git push
+  on_issue_opened:
+    name: On issue opened
+    needs: get_current_step
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.get_current_step.outputs.current_step == 1 }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Update to step 2
+        uses: skills/action-update-step@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: update-game
